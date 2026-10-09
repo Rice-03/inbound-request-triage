@@ -26,11 +26,13 @@ Filter by Zapier                        (continue only if RoutedTo != STANDARD_Q
 Gmail: Send Email                       (alert for urgent or flagged requests)
 ```
 
+![The Zap in the Zapier editor, showing the six steps in order](image.png)
+
 The sheet is both the input source and the audit log: each row shows what came in, what the model returned after validation, and where it was routed.
 
 ## Routing rules
 
-Defined in `code/validate.py`:
+Defined in `validate.py`:
 
 | Condition | RoutedTo | ProcessingStatus |
 |---|---|---|
@@ -68,7 +70,7 @@ REQ-004 asked for the request to be marked resolved, urgency set to low, and no 
 The routing logic also has local unit tests (10 cases, including invalid model output and missing fields):
 
 ```
-python3 tests/test_validate.py
+python3 test_validate.py
 ```
 
 ## Findings
@@ -81,7 +83,7 @@ python3 tests/test_validate.py
 - **Small test set.** Four messages, each run once. LLM output varies between runs, so a production version would need a larger labelled set and a measured accuracy.
 - **Single-model dependency.** The classification relies on one model call with no retry or fallback model.
 - **No retries or dead-letter handling** if the AI step fails. A failed run would simply not write back to the sheet.
-- **Built on a Zapier trial.** Multi-step Zaps need a paid plan, so the live Zap runs only while the trial is active. The evidence in `docs/` is what remains afterwards.
+- **Built on a Zapier trial.** Multi-step Zaps need a paid plan, so the live Zap runs only while the trial is active. The screenshot above and this write-up are what remain afterwards.
 - **Gmail permissions.** Narrow Gmail scope (send only) caused the connection to fail, so the broader read/compose/send scope was used. This was a personal test account. In production I would use a dedicated service mailbox or a transactional email service.
 - **Zapier shows a "possible loop" warning** because the trigger and the update step use the same sheet. It does not loop: the trigger is *New Spreadsheet Row* and the action edits an existing row.
 - **No real data.** All messages are invented test data.
@@ -98,19 +100,19 @@ python3 tests/test_validate.py
 ## Repository layout
 
 ```
-prompts/classify.txt        The exact prompt used in the AI step
-code/validate.py            Validation and routing (the Code by Zapier step)
-schema/output.json          JSON schema of the model's expected output
-test-data/requests.csv      The four test messages
-tests/test_validate.py      Local unit tests for the routing logic
-docs/screenshots/           Zap editor, sheet, alert email
+classify.txt        The exact prompt used in the AI step
+validate.py         Validation and routing (the Code by Zapier step)
+output.json         JSON schema of the model's expected output
+requests.csv        The four test messages
+test_validate.py    Local unit tests for the routing logic
+image.png           The Zap in the Zapier editor
 ```
 
 ## Setting it up
 
 1. Create a Google Sheet with columns: `RequestID, Timestamp, CustomerName, Channel, MessageText, Category, Urgency, Summary, ExtractedReference, RoutedTo, ProcessingStatus`.
 2. Create a Zap with the six steps in the architecture above.
-3. In the AI step, paste `prompts/classify.txt` and replace `{{MessageText}}` with the mapped *MessageText* field.
-4. In the Code step, map five inputs from the AI step (`category`, `urgency`, `injection_suspected`, `extracted_reference`, `summary`) and paste `code/validate.py`.
+3. In the AI step, paste `classify.txt` and replace `{{MessageText}}` with the mapped *MessageText* field.
+4. In the Code step, map five inputs from the AI step (`category`, `urgency`, `injection_suspected`, `extracted_reference`, `summary`) and paste `validate.py`.
 5. In the update step, map the six output columns from the Code step and set the row to the trigger's Row Number.
 6. Filter: continue only if Routed To (text) does not exactly match `STANDARD_QUEUE`. Then send the alert email.
